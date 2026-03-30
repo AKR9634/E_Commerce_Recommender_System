@@ -7,10 +7,10 @@ from sklearn.metrics.pairwise import cosine_similarity
 R, U, sigma, V, tfidf, tfidf_matrix, product_to_idx, asin_to_name, asin_to_meta_idx, user_map, item_map, user_inv_map, item_inv_map, ratings = load_data()
 
 # Product metadata (for content-based)
-meta_df = pd.read_csv("../Data/cleaned_meta_app.csv")
+meta_df = pd.read_csv("Data/cleaned_meta_app.csv")
 
 # User ratings (for collaborative filtering)
-ratings_df = pd.read_csv("../Data/cleaned_app.csv")
+ratings_df = pd.read_csv("Data/cleaned_app.csv")
 
 
 def minmax_norm(arr):
@@ -118,8 +118,10 @@ def hybrid_recommend(
     if not known_user:
         print(f"[INFO] Unknown user '{user_id}'. Falling back to content-based only.")
         if anchor_product_name is None:
-            print("[WARN] Please provide anchor_product_name for unknown users.")
-            return None
+            prod_idx = ratings.groupby('parent_asin', as_index=False, observed=False)['user_rating'].agg(['count', 'mean']).sort_values(by=["count", "mean"],ascending=False)["parent_asin"][:5].values
+            cand_prod_name = meta_df[meta_df['Parent_ASIN'].isin(prod_idx)]["Product_Name"].values
+            cand_prod_name = cand_prod_name.tolist()
+            return cand_prod_name
 
         anchor_idx = product_to_idx.get(anchor_product_name)
         if anchor_idx is None:
@@ -133,7 +135,7 @@ def hybrid_recommend(
         sel = apply_mmr(top_cands, sim_scores[top_cands], top_n, lambda_param)
         results = meta_df.iloc[sel][["Product_Name", "Category", "Parent_ASIN"]].copy()
         results["hybrid_score"] = [sim_scores[i] for i in sel]
-        return results.reset_index(drop=True)
+        return list(results["Product_Name"].values)
 
     # ------------------------------------------------------------------ #
     # SVD scores for all items (collaborative signal)                     #
@@ -234,6 +236,7 @@ def hybrid_recommend(
     }
 
     output_rows = []
+    res = []
     for meta_idx in selected:
         row  = meta_idx_to_scores[meta_idx]
         prod = meta_df.iloc[meta_idx]
@@ -245,5 +248,6 @@ def hybrid_recommend(
             "cb_score":      round(row.cb_score,  4),
             "hybrid_score":  round(row.hybrid_score, 4),
         })
+        res.append(prod["Product_Name"])
 
-    return pd.DataFrame(output_rows)
+    return res

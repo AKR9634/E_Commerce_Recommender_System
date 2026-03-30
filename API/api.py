@@ -1,7 +1,5 @@
-from fastapi import FastAPI, Query, Path
-from pydantic import Field, field_validator, model_validator
-from typing import Literal
-from fastapi.exceptions import HTTPException
+from fastapi import FastAPI, Query
+from Functions.load_methods import hybrid_recommend
 
 app = FastAPI()
 
@@ -9,4 +7,9 @@ app = FastAPI()
 def home():
     return {"message" : "Product Recommender System!!!"}
 
-@app.recommend("/recommend/{}"):
+@app.get("/recommend")
+def recommend(user: str = Query("UNKNOWN_USER_ID", description = "User ID"), product_asin : str = Query(None, Description = "Product Identification Number")):
+
+    res = hybrid_recommend(user, product_asin)
+
+    return res
